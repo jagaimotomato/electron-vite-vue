@@ -1,8 +1,9 @@
 <template>
-  <div class="convert-container">
+  <div class="convert-container" @click="onContainerClick">
     <div class="form-input">
       <v-file-input
         label="选择文件"
+        class="file-input"
         color="deep-purple-accent-4"
         variant="outlined"
         chips
@@ -13,6 +14,7 @@
         width="500px"
         @update:modelValue="onChange"
         :accept="`.${type}`"
+        :disabled="disabled"
       ></v-file-input>
       <div class="btn-wrap">
         <el-popover
@@ -22,12 +24,12 @@
           :width="512"
         >
           <template #reference>
-            <v-btn class="m-2" @click="onPopoverChange">{{
+            <v-btn class="m-2 btn" @click="onPopoverChange">{{
               type || "选择格式"
             }}</v-btn>
           </template>
           <template #default>
-            <type-select v-model="type"></type-select>
+            <type-select v-model="type" @select="visible = false"></type-select>
           </template>
         </el-popover>
         <v-icon icon="mdi-arrow-right-box"></v-icon>
@@ -38,12 +40,15 @@
           :width="512"
         >
           <template #reference>
-            <v-btn class="m-2" @click="onBeTransTypeVisibleChange">{{
+            <v-btn class="m-2 btn" @click="onBeTransTypeVisibleChange">{{
               beTransType || "选择格式"
             }}</v-btn>
           </template>
           <template #default>
-            <type-select v-model="beTransType"></type-select>
+            <type-select
+              v-model="beTransType"
+              @select="beTransTypeVisible = false"
+            ></type-select>
           </template>
         </el-popover>
       </div>
@@ -54,13 +59,15 @@
           <th class="text-left">名称</th>
           <th class="text-left">大小</th>
           <th class="text-left">进度</th>
+          <th class="text-left">目标格式</th>
         </tr>
       </thead>
       <tbody>
         <tr v-for="item in selectedFiles" :key="item.name">
           <td>{{ item.name }}</td>
           <td>{{ getFileSizeStr(item.size) }}</td>
-          <td>{{ item.percent }}</td>
+          <td>{{ item.params.percent }}</td>
+          <td>{{ item.params.outputFormat }}</td>
         </tr>
       </tbody>
     </v-table>
@@ -68,8 +75,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, toRaw, reactive } from "vue";
+import { ref, onMounted, onUnmounted, toRaw, reactive, computed } from "vue";
 import TypeSelect from "../components/TypeSelect.vue";
+import { ClickOutside as vClickOutside } from "element-plus";
 
 const visible = ref(false);
 const beTransTypeVisible = ref(false);
@@ -88,6 +96,10 @@ const onBeTransTypeVisibleChange = () => {
   beTransTypeVisible.value = !beTransTypeVisible.value;
 };
 
+const disabled = computed(() => {
+  return !beTransType.value || beTransType.value === type.value;
+});
+
 const onChange = (files) => {
   console.log("Convert.vue->46", files, selectedFiles);
   if (files.length) {
@@ -95,12 +107,20 @@ const onChange = (files) => {
       if (!selectedFiles.some((v) => isSameFile(v, file))) {
         selectedFiles.push(file);
         file.outputFormat = beTransType.value;
+        // 在file对象中新建一个传递给 ffmpeg 的参数
+        file.params = {
+          outputFormat: beTransType.value,
+          filePath: file.path,
+          id: self.crypto.randomUUID(),
+          percent: 0,
+          status: "beFormated",
+        };
+        startConversion(file.params);
       }
     });
   } else {
     selectedFiles = [];
   }
-  startConversion();
 };
 
 function isSameFile(file1, file2) {
@@ -123,16 +143,10 @@ const getFileSizeStr = (size) => {
   return `${Math.floor(size * 100) / 100}${units[unitIndex]}`;
 };
 
-const startConversion = async () => {
-  if (!selectedFiles.length) return;
-
+const startConversion = async (params) => {
   // 如果之前的转换还在进行中，可以先取消或等待它完成
   // 这里简单处理为如果有正在进行的转换，则等待它完成
   // 实际情况可能需要更复杂的逻辑来处理并发转换请求
-  const params = {
-    filePath: selectedFiles[0].path,
-    outputFormat: selectedFiles[0].outputFormat,
-  };
   console.log("Convert.vue->136", params);
   try {
     const result = await window.ipcRenderer.invoke("convert-audio", params);
@@ -146,6 +160,28 @@ const startConversion = async () => {
   } finally {
   }
 };
+
+// 处理popover 点击其他地方关闭
+const onContainerClick = (event) => {
+  console.log("Convert.vue->159", event);
+};
+
+// 设置进度事件的监听器
+const conversionListener = (event, file) => {
+  console.log("Convert.vue->171", file);
+  const { id, percent } = file;
+};
+onMounted(() => {
+  window.ipcRenderer.on("conversion-progress", conversionListener);
+});
+onUnmounted(() => {
+  if (conversionListener) {
+    window.ipcRenderer.removeListener(
+      "conversion-progress",
+      conversionListener,
+    );
+  }
+});
 </script>
 
 <style scoped>
@@ -169,7 +205,7 @@ const startConversion = async () => {
   display: none;
 }
 
-:deep(.v-input) {
+:deep(.file-input.v-input) {
   width: 600px;
   flex: unset;
   flex-shrink: 0;
@@ -177,5 +213,9 @@ const startConversion = async () => {
 
 :deep(.mdi-arrow-right-box) {
   margin: 0 12px;
+}
+
+.btn {
+  width: 94px;
 }
 </style>

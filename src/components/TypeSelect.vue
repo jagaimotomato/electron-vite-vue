@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { list } from "./config.json";
-import { ref, computed } from "vue";
+import { ref, computed, defineEmits } from "vue";
+
+const emit = defineEmits(["select"]);
 const model = defineModel();
 const keywords = ref("");
 const tab = ref("1");
@@ -10,6 +12,7 @@ const poolList = list.map((v) => v.prefix).flat();
 const onChange = (status: boolean, item: string) => {
   if (status) {
     model.value = item;
+    emit("select");
   } else {
     model.value = "";
   }
@@ -18,8 +21,8 @@ const onChange = (status: boolean, item: string) => {
 function update() {}
 
 const filterList = computed(() => {
-  return poolList.filter(v => v.includes(keywords.value))
-})
+  return poolList.filter((v) => v.includes(keywords.value));
+});
 </script>
 
 <template>
@@ -64,11 +67,11 @@ const filterList = computed(() => {
       </div>
       <v-card v-else flat class="tag-wrap">
         <el-check-tag
-            type="success"
-            v-for="(item, index) in filterList"
-            :key="`tag-${index}`"
-            :checked="item === model"
-            @change="(status: boolean) => onChange(status, item)"
+          type="success"
+          v-for="(item, index) in filterList"
+          :key="`tag-${index}`"
+          :checked="item === model"
+          @change="(status: boolean) => onChange(status, item)"
         >
           {{ item }}
         </el-check-tag>

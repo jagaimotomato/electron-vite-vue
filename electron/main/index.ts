@@ -139,10 +139,10 @@ ipcMain.handle("open-win", (_, arg) => {
 // 设置 IPC 监听器
 ipcMain.handle("convert-audio", async (event, file) => {
   console.log("index.ts->141", file);
-  const { outputFormat } = file;
-  const filePath = file.path;
+  const { outputFormat, filePath } = file;
   return new Promise(async (resolve, reject) => {
     try {
+      file.status = 'formating';
       const dir = path.dirname(filePath);
       const baseName = path.basename(filePath, path.extname(filePath));
       const outputFilePath = path.join(dir, `${baseName}.${outputFormat}`);
@@ -160,9 +160,11 @@ ipcMain.handle("convert-audio", async (event, file) => {
           console.log(`Target Size: ${progress.targetSize}`);
           console.log(`Timemark: ${progress.timemark}`);
           file.percent = progress.percent;
+          event.sender.send("conversion-progress", file);
         })
         .on("end", () => {
           console.log("Conversion successful!");
+          file.status = '';
           resolve("Conversion successful!");
         })
         .on("error", (err, stdout, stderr) => {
