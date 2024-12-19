@@ -2,7 +2,9 @@ import fs from 'node:fs'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import electron from 'vite-plugin-electron/simple'
+import vuetify from 'vite-plugin-vuetify'
 import pkg from './package.json'
+import path from 'path'
 
 // https://vitejs.dev/config/
 export default defineConfig(({ command }) => {
@@ -61,7 +63,16 @@ export default defineConfig(({ command }) => {
         // See 👉 https://github.com/electron-vite/vite-plugin-electron-renderer
         renderer: {},
       }),
+      vuetify({ autoImport: true })
     ],
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, 'src'),
+        'components': path.resolve(__dirname, 'src/components'),
+        'assets': path.resolve(__dirname, 'src/assets'),
+        // Add more aliases as needed
+      }
+    },
     server: process.env.VSCODE_DEBUG && (() => {
       const url = new URL(pkg.debug.env.VITE_DEV_SERVER_URL)
       return {
@@ -70,5 +81,13 @@ export default defineConfig(({ command }) => {
       }
     })(),
     clearScreen: false,
+    css: {
+      preprocessorOptions: {
+        additionalData: '@import "assets/styles/variable.scss";@import "assets/styles/mixin.scss";',
+        scss: {
+          api: "modern-compiler" // or 'modern'
+        }
+      }
+    }
   }
 })
